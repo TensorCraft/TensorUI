@@ -1,11 +1,16 @@
 #include "screen.h"
 #include "../../color/color.h"
+#include "../time/time.h"
 
 SDL_Window *window = NULL;
 SDL_Renderer *renderer = NULL;
 Frame Frames[MAX_FRAMES];
 int frame_count = 0;
 bool renderFlag = true;
+bool onTouch = false;
+int focus = -1;
+long long time_touch = -1;
+long long time_untouch = -1;
 
 #ifdef ROUND_SCREEN
 bool roundMask[SCREEN_WIDTH][SCREEN_HEIGHT];
@@ -85,7 +90,7 @@ void fillScreen(Color color)
 
 void Pixel(int x, int y, Color color)
 {
-    if(color.transparent)
+    if (color.transparent)
         return;
     SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, 255);
     SDL_RenderDrawPoint(renderer, x, y);
@@ -248,6 +253,36 @@ bool updateScreen()
             close_screen();
             return false;
         }
+        if (event.type == SDL_MOUSEBUTTONDOWN)
+        {
+            if (event.button.button == SDL_BUTTON_LEFT)
+            {
+                printf("Left mouse button pressed at (%d, %d)\n",
+                       event.button.x, event.button.y);
+                time_touch = current_timestamp_ms();
+                for(int i = frame_count; i >= 0;i --)
+                    if(Frames[i].enabled && Frames[i].x <= event.button.x && Frames[i].width + Frames[i].x >= event.button.x && Frames[i].y <= event.button.y && Frames[i].height + Frames[i].y >= event.button.y) {
+                        focus = i;
+                        break;
+                    }
+            }
+        }
+        if (event.type == SDL_MOUSEBUTTONUP)
+        {
+            if (event.button.button == SDL_BUTTON_LEFT)
+            {
+                printf("Left mouse button released at (%d, %d)\n",
+                       event.button.x, event.button.y);
+                time_untouch = current_timestamp_ms();
+                if(time_untouch - time_touch <= 500 && focus!=-1) {
+                    if(Frames[focus].enabled && Frames[focus].x <= event.button.x && Frames[focus].width + Frames[focus].x >= event.button.x && Frames[focus].y <= event.button.y && Frames[focus].height + Frames[focus].y >= event.button.y) {
+                        if(Frames[focus].onClick != NULL)
+                            Frames[focus].onClick();
+                    }
+                }
+                focus = -1;
+            }
+        }
     }
     if (!renderFlag)
         return true;
@@ -267,7 +302,7 @@ void close_screen()
     SDL_Quit();
 }
 
-int requestFrame(int width, int height, int x, int y, void* object, void (*preRender)(void *self), Color (*getPixel)(void *self, int x, int y), void (*onClick)(), void (*onTouch)())
+int requestFrame(int width, int height, int x, int y, void *object, void (*preRender)(void *self), Color (*getPixel)(void *self, int x, int y), void (*onClick)(), void (*onTouch)())
 {
     if (frame_count == MAX_FRAMES)
     {
