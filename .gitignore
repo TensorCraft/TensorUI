@@ -1,0 +1,9 @@
+# Binaries
+sdl_example
+
+# Build artifacts
+*.o
+*.d
+
+# OS files
+.DS_Store
