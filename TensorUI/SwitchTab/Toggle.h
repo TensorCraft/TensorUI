@@ -11,6 +11,7 @@ typedef struct {
     Color offColor;
     Color thumbColor;
     void (*onToggle)(bool state);
+    int frameId;
 } Toggle;
 
 Toggle* createToggle(int x, int y, bool initialState, void (*onToggle)(bool state));

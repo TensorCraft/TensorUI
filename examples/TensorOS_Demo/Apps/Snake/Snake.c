@@ -1,8 +1,8 @@
 #include "Snake.h"
 #include "../../../../TensorUI/WindowManager.h"
 #include "../../../../hal/screen/screen.h"
-#include <stdlib.h>
-#include <time.h>
+#include "../../../../hal/rand/rand.h"
+#include "../../../../hal/time/time.h"
 
 #define GRID_SIZE 15
 #define MAX_SNAKE_LEN 100
@@ -22,19 +22,41 @@ typedef struct {
   int moveCounter;
   int score;
   int frameId;
+  int contentLeft;
+  int contentTop;
+  int contentWidth;
+  int contentHeight;
+  int cols;
+  int rows;
+  long long lastStepMs;
 } SnakeGame;
 
-static SnakeGame game;
+static SnakeGame game = { .frameId = -1 };
+
+static void refreshSnakeBounds() {
+  ScreenInsets insets = getScreenSafeInsets();
+  game.contentLeft = insets.left;
+  game.contentTop = insets.top;
+  game.contentWidth = getScreenContentWidth(insets);
+  game.contentHeight = getScreenContentHeight(insets);
+  game.cols = game.contentWidth / GRID_SIZE;
+  game.rows = game.contentHeight / GRID_SIZE;
+  if (game.cols < 4)
+    game.cols = 4;
+  if (game.rows < 4)
+    game.rows = 4;
+}
 
 static void spawnFood() {
-  game.food.x = rand() % (SCREEN_WIDTH / GRID_SIZE);
-  game.food.y = rand() % (SCREEN_HEIGHT / GRID_SIZE);
+  game.food.x = (int)(hal_rand() % game.cols);
+  game.food.y = (int)(hal_rand() % game.rows);
 }
 
 static void initSnake() {
+  refreshSnakeBounds();
   game.length = 3;
-  int startX = (SCREEN_WIDTH / GRID_SIZE) / 2;
-  int startY = (SCREEN_HEIGHT / GRID_SIZE) / 2;
+  int startX = game.cols / 2;
+  int startY = game.rows / 2;
   for (int i = 0; i < game.length; i++) {
     game.body[i].x = startX - i;
     game.body[i].y = startY;
@@ -43,18 +65,27 @@ static void initSnake() {
   game.gameOver = false;
   game.score = 0;
   game.moveCounter = 0;
+  game.lastStepMs = current_timestamp_ms();
   spawnFood();
 }
 
 static Color snakeGetPixel(void *self, int x, int y) {
-  int gx = x / GRID_SIZE;
-  int gy = y / GRID_SIZE;
-  int px = x % GRID_SIZE;
-  int py = y % GRID_SIZE;
+  int right = game.contentLeft + game.cols * GRID_SIZE;
+  int bottom = game.contentTop + game.rows * GRID_SIZE;
+
+  if (x < game.contentLeft || x >= right || y < game.contentTop || y >= bottom)
+    return COLOR_TRANSPARENT;
+
+  int localX = x - game.contentLeft;
+  int localY = y - game.contentTop;
+  int gx = localX / GRID_SIZE;
+  int gy = localY / GRID_SIZE;
+  int px = localX % GRID_SIZE;
+  int py = localY % GRID_SIZE;
 
   // Borders
-  if (x == 0 || x == SCREEN_WIDTH - 1 || y == 0 || y == SCREEN_HEIGHT - 1)
-    return COLOR_DARK_GRAY;
+  if (x == game.contentLeft || x == right - 1 || y == game.contentTop || y == bottom - 1)
+    return M3_OUTLINE;
 
   // Draw Food
   if (gx == game.food.x && gy == game.food.y) {
@@ -62,31 +93,32 @@ static Color snakeGetPixel(void *self, int x, int y) {
     int cy = GRID_SIZE / 2;
     if ((px - cx) * (px - cx) + (py - cy) * (py - cy) <
         (GRID_SIZE / 2) * (GRID_SIZE / 2))
-      return COLOR_RED;
+      return M3_ERROR;
   }
 
   // Draw Snake
   for (int i = 0; i < game.length; i++) {
     if (gx == game.body[i].x && gy == game.body[i].y) {
       if (i == 0)
-        return COLOR_CYAN;
-      return COLOR_GREEN;
+        return M3_PRIMARY;
+      return M3_SECONDARY;
     }
   }
+
 
   return COLOR_TRANSPARENT;
 }
 
 static void snakePreRender(void *self) {
   if (game.gameOver) {
-    renderFlag = true;
+    invalidateFrame(game.frameId);
     return;
   }
 
-  game.moveCounter++;
-  if (game.moveCounter < 1500)
+  long long now = current_timestamp_ms();
+  if (now - game.lastStepMs < 140)
     return;
-  game.moveCounter = 0;
+  game.lastStepMs = now;
 
   Point nextHead = game.body[0];
   if (game.dir == DIR_UP)
@@ -98,8 +130,8 @@ static void snakePreRender(void *self) {
   else if (game.dir == DIR_RIGHT)
     nextHead.x++;
 
-  if (nextHead.x < 0 || nextHead.x >= (SCREEN_WIDTH / GRID_SIZE) ||
-      nextHead.y < 0 || nextHead.y >= (SCREEN_HEIGHT / GRID_SIZE)) {
+  if (nextHead.x < 0 || nextHead.x >= game.cols ||
+      nextHead.y < 0 || nextHead.y >= game.rows) {
     game.gameOver = true;
     return;
   }
@@ -124,7 +156,7 @@ static void snakePreRender(void *self) {
     spawnFood();
   }
 
-  renderFlag = true;
+  invalidateFrame(game.frameId);
 }
 
 static void snakeOnClick(void *self) {
@@ -138,8 +170,8 @@ static void snakeOnClick(void *self) {
   if (tx < 40)
     return;
 
-  int cx = SCREEN_WIDTH / 2;
-  int cy = SCREEN_HEIGHT / 2;
+  int cx = game.contentLeft + game.contentWidth / 2;
+  int cy = game.contentTop + game.contentHeight / 2;
   int dx = tx - cx;
   int dy = ty - cy;
 
@@ -162,11 +194,20 @@ static void snakeOnClick(void *self) {
   }
 }
 
+static void snakeOnDestroy(void *self) {
+  game.frameId = -1;
+}
+
 void pushSnakeApp() {
   initSnake();
-  game.frameId =
-      requestFrame(SCREEN_WIDTH, SCREEN_HEIGHT, 0, 0, NULL, snakePreRender,
-                   snakeGetPixel, snakeOnClick, NULL);
-  Frames[game.frameId].bgcolor = COLOR_BLACK;
+  if (game.frameId == -1) {
+    game.frameId =
+        requestFrame(SCREEN_WIDTH, SCREEN_HEIGHT, 0, 0, NULL, snakePreRender,
+                     snakeGetPixel, snakeOnClick, NULL);
+    Frames[game.frameId].bgcolor = M3_DARK_BG;
+    Frames[game.frameId].continuousRender = true;
+    Frames[game.frameId].onDestroy = snakeOnDestroy;
+    configureFrameAsAppSurface(game.frameId, true);
+  }
   pushWindow(game.frameId);
 }

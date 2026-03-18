@@ -1,5 +1,5 @@
 #include "Toggle.h"
-#include <stdlib.h>
+#include "../../hal/mem/mem.h"
 #include "../../hal/screen/screen.h"
 
 static Color toggleGetPixel(void *self, int x, int y) {
@@ -37,7 +37,7 @@ static void toggleOnClick(void *self) {
 }
 
 Toggle* createToggle(int x, int y, bool initialState, void (*onToggle)(bool state)) {
-    Toggle *tg = (Toggle *)malloc(sizeof(Toggle));
+    Toggle *tg = (Toggle *)hal_malloc(sizeof(Toggle));
     tg->x = x;
     tg->y = y;
     tg->width = 50;  // Default size
@@ -48,6 +48,10 @@ Toggle* createToggle(int x, int y, bool initialState, void (*onToggle)(bool stat
     tg->thumbColor = COLOR_WHITE;
     tg->onToggle = onToggle;
 
-    requestFrame(tg->width, tg->height, x, y, tg, NULL, toggleGetPixel, toggleOnClick, NULL);
+    tg->frameId = requestFrame(tg->width, tg->height, x, y, tg, NULL, toggleGetPixel, toggleOnClick, NULL);
+    if (tg->frameId == -1) {
+        hal_free(tg);
+        return NULL;
+    }
     return tg;
 }

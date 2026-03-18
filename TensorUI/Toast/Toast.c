@@ -1,8 +1,8 @@
 #include "Toast.h"
+#include "../../hal/mem/mem.h"
+#include "../../hal/str/str.h"
 #include "../../hal/screen/screen.h"
 #include "../../hal/time/time.h"
-#include <stdlib.h>
-#include <string.h>
 
 #define MAX_TOASTS 10
 
@@ -12,7 +12,7 @@ typedef struct {
     int head;
     int tail;
     bool isShowing;
-    long showStartTime;
+    long long showStartTime;
     Font font;
     bool *textBitmap;
     int textWidth;
@@ -51,16 +51,16 @@ static Color toastGetPixel(void *self, int x, int y) {
 
 static void toastPreRender(void *self) {
     if(tm->isShowing) {
-        long now = current_timestamp_ms();
+        long long now = current_timestamp_ms();
         if (now - tm->showStartTime > tm->durations[tm->head]) {
             // Toast expired
             tm->isShowing = false;
             if(tm->textBitmap) {
-                free(tm->textBitmap);
+                hal_free(tm->textBitmap);
                 tm->textBitmap = NULL;
             }
             tm->head = (tm->head + 1) % MAX_TOASTS;
-            Frames[toastFrameId].enabled = false;
+            // Keep enabled=true so preRender continues to run for the next message
             renderFlag = true;
         }
     }
@@ -76,11 +76,14 @@ static void toastPreRender(void *self) {
         int h = tm->font.char_height + 20;
         Frames[toastFrameId].width = w;
         Frames[toastFrameId].height = h;
-        Frames[toastFrameId].x = (SCREEN_WIDTH - w) / 2;
-        Frames[toastFrameId].y = 50; // Pop up right below the tab bar
+        Frames[toastFrameId].fx = (float)((SCREEN_WIDTH - w) / 2);
+        Frames[toastFrameId].fy = (float)(SCREEN_HEIGHT - h - 30); // Android-style bottom fixed position
+        Frames[toastFrameId].x = (int)Frames[toastFrameId].fx;
+        Frames[toastFrameId].y = (int)Frames[toastFrameId].fy;
         Frames[toastFrameId].clipW = -1; // Unclipped global layer
         Frames[toastFrameId].clipH = -1;
         Frames[toastFrameId].enabled = true;
+
         
         renderFlag = true;
     }
@@ -88,23 +91,25 @@ static void toastPreRender(void *self) {
 
 void initToastManager(Font font) {
     if(tm) return;
-    tm = (ToastManagerData *)malloc(sizeof(ToastManagerData));
+    tm = (ToastManagerData *)hal_malloc(sizeof(ToastManagerData));
     tm->head = 0;
     tm->tail = 0;
     tm->isShowing = false;
     tm->font = font;
     tm->textBitmap = NULL;
     
-    // We register a permanent frame, but disable it initially.
+    // We register a permanent frame, always enabled to monitor the queue.
     toastFrameId = requestFrame(10, 10, 0, 0, NULL, toastPreRender, toastGetPixel, NULL, NULL);
-    Frames[toastFrameId].enabled = false;
+    Frames[toastFrameId].enabled = true;
+    configureFrameAsSystemSurface(toastFrameId, true);
+    Frames[toastFrameId].continuousRender = true;
 }
 
 void showToast(const char *message, int duration_ms) {
     if(tm) {
         int next = (tm->tail + 1) % MAX_TOASTS;
         if(next != tm->head) {
-            strncpy(tm->queue[tm->tail], message, 63);
+            hal_strncpy(tm->queue[tm->tail], message, 63);
             tm->queue[tm->tail][63] = '\0';
             tm->durations[tm->tail] = duration_ms;
             tm->tail = next;

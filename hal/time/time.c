@@ -23,3 +23,11 @@ long long current_timestamp_ms() {
     return (long long)tv.tv_sec * 1000 + tv.tv_usec / 1000;
 #endif
 }
+
+void hal_sleep_ms(unsigned int ms) {
+#ifdef _WIN32
+    Sleep(ms);
+#else
+    usleep((useconds_t)ms * 1000);
+#endif
+}

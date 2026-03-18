@@ -1,5 +1,5 @@
 #include "ProgressBar.h"
-#include <stdlib.h>
+#include "../../hal/mem/mem.h"
 #include <stdbool.h>
 #include "../../hal/screen/screen.h"
 
@@ -14,7 +14,7 @@ static Color progressGetPixel(void *self, int x, int y) {
 }
 
 ProgressBar* createProgressBar(int x, int y, int w, int h, float initialProgress) {
-    ProgressBar *pb = (ProgressBar *)malloc(sizeof(ProgressBar));
+    ProgressBar *pb = (ProgressBar *)hal_malloc(sizeof(ProgressBar));
     pb->x = x;
     pb->y = y;
     pb->width = w;
@@ -23,17 +23,25 @@ ProgressBar* createProgressBar(int x, int y, int w, int h, float initialProgress
     pb->barColor = (Color){0, 122, 255, false}; // Blue
     pb->bgColor = (Color){50, 50, 50, false};   // Gray
 
-    requestFrame(w, h, x, y, pb, NULL, progressGetPixel, NULL, NULL);
+    pb->frameId = requestFrame(w, h, x, y, pb, NULL, progressGetPixel, NULL, NULL);
+    if (pb->frameId == -1) {
+        hal_free(pb);
+        return NULL;
+    }
     return pb;
 }
-
-extern bool renderFlag;
 
 void setProgress(ProgressBar *pb, float progress) {
     if (progress < 0) progress = 0;
     if (progress > 1) progress = 1;
     if (pb->progress != progress) {
+        float oldProgress = pb->progress;
         pb->progress = progress;
-        renderFlag = true;
+        int oldFillWidth = (int)(pb->width * oldProgress);
+        int newFillWidth = (int)(pb->width * pb->progress);
+        int dirtyX = oldFillWidth < newFillWidth ? oldFillWidth : newFillWidth;
+        int dirtyW = oldFillWidth > newFillWidth ? oldFillWidth - newFillWidth : newFillWidth - oldFillWidth;
+        if (dirtyW <= 0) dirtyW = pb->width;
+        invalidateFrameRect(pb->frameId, dirtyX, 0, dirtyW, pb->height);
     }
 }

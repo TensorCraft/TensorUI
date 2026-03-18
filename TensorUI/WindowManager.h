@@ -15,8 +15,10 @@ typedef struct {
 void initWindowManager();
 void pushWindow(int frameId);
 void popWindow();
+void popToHome();
 int getTopWindow();
 void updateWindowManager();
+bool canBeginSystemBackGesture();
 
 // Global Window Manager State
 extern WindowManager WinMgr;

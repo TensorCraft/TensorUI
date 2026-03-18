@@ -1,50 +1,73 @@
 # TensorUI
 
-A lightweight, premium-styled UI framework for embedded systems and cross-platform applications, written in pure C with SDL2.
+A lightweight C UI framework for embedded-style operating system interfaces.
 
 ![TensorOS Demo](assets/demo.gif)
 
-## 🚀 Overview
+## Overview
 
-TensorUI is designed to provide a modern, responsive, and aesthetically pleasing interface for resource-constrained environments. It features a layout engine similar to modern web frameworks (VStack, HStack), advanced gesture support, and a flexible window management system.
+TensorUI is being hardened into a durable UI framework for a self-built embedded OS. The current codebase already provides a working frame renderer, window stack, layout containers, text input controls, and a small widget set, with SDL2 used as the current desktop runtime.
 
-### Features
-- **Modern Layouts**: Flex-box inspired `VStack` and `HStack` for easy component positioning.
-- **Premium Components**: Includes Buttons, Labels, Sliders, Progress Bars, Toggles, and interactive Canvases.
-- **Custom Font Engine**: Fast, specialized font rendering for crisp text.
-- **Window Management**: Built-in stack-based window management for complex app navigation.
-- **HAL Layer**: Clean Hardware Abstraction Layer for easy transplanting to different displays or input devices.
-- **Animated Toast System**: Non-intrusive notification system.
+The project goal is not to preserve a flashy demo, but to establish clear framework contracts around:
 
-## 📱 Embedded Apps (TensorOS Demo)
-The included `TensorOS_Demo` showcases the framework's capabilities:
-- **Snake Game**: A classic arcade game utilizing touch/mouse direction control.
-- **Calculator**: A fully functional arithmetic calculator.
-- **Digital Paint**: An interactive canvas for free-hand drawing.
-- **System Settings**: A complex nested interface with toggles and sliders.
+- input and gesture ownership
+- focus and text input session behavior
+- layout and safe-area behavior
+- rendering and invalidation rules
+- widget and system-surface contracts
 
-## 🛠 Tech Stack
-- **Language**: C99
-- **Graphics & Input**: SDL2
-- **Hardware Abstraction**: Custom HAL for Screen, Input, Time, and Font operations.
+## Current Capabilities
 
-## 🏗 Project Structure
-- `TensorUI/`: Core framework components (Layouts, UI elements, Window Manager).
-- `examples/`: Ready-to-run demonstration applications.
-- `hal/`: Hardware Abstraction Layer implementations.
-- `fonts/`: Pre-rendered `.bfont` resources.
-- `tools/`: Python utilities for generating custom font assets.
+- Frame-based rendering and composition
+- Stack-based window manager
+- Shared input session and gesture arbitration baseline
+- Framework-owned focus and active text-input session baseline
+- Layout containers such as `VStack` and `HStack`
+- Common widgets including buttons, labels, sliders, cards, dialogs, keyboard, canvas, and text fields
+- Safe-area helpers for round and rectangular displays
 
-## 🚀 Getting Started
+## Repository Layout
 
-### Prerequisites
-- GCC or Clang
-- SDL2 development libraries (e.g., `brew install sdl2` on macOS)
+- `TensorUI/`: framework widgets, containers, and window management
+- `hal/`: hardware abstraction for screen, input, memory, time, math, and fonts
+- `examples/`: current SDL demo app used as a framework integration surface
+- `docs/public/`: GitHub-suitable public framework docs
+- `docs/local/`: local audit notes, repair logs, and milestone planning
+- `tools/`: asset and font utilities
 
-### Build and Run
+## Build
+
+### Requirements
+
+- C compiler with C99 support
+- SDL2 development libraries
+
+On macOS with Homebrew:
+
 ```bash
-make clean && make run
+brew install sdl2
 ```
 
-## 📄 License
-This project is part of the TensorCraft ecosystem. See individual source files and `fonts/SIL Open Font License.txt` for specific licensing details.
+### Commands
+
+```bash
+make
+make check
+make run
+```
+
+`make check` is the current repeatable verification baseline and confirms that the framework plus demo integration surface still compile together.
+
+## Documentation
+
+- Usage guide: [docs/public/usage-guide.md](docs/public/usage-guide.md)
+- Architecture notes: [docs/public/architecture.md](docs/public/architecture.md)
+- Documentation index: [docs/README.md](docs/README.md)
+
+## Status
+
+TensorUI has completed its first framework hardening pass through input, focus, layout, rendering, and component contract cleanup. The next priority is strengthening verification and publication quality so the repository stands on its own without local conversation context.
+
+## License
+
+See [fonts/SIL Open Font License.txt](fonts/SIL%20Open%20Font%20License.txt) for font licensing details. Other project licensing should be clarified before external publication.

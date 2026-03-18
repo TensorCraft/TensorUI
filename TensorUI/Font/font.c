@@ -1,7 +1,6 @@
 #include "font.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include "../../hal/stdio/stdio.h"
+#include "../../hal/mem/mem.h"
 #include "../../hal/font/font_hal.h"
 // #include "config.h"
 
@@ -10,8 +9,8 @@ const Font EMPTY_FONT = {.char_height = 0};
 
 static bool readFontData(Font *font, const char *path) {
 #ifdef DEBUG
-    puts("Loading font via HAL at:");
-    puts(path);
+    hal_puts("Loading font via HAL at:");
+    hal_puts(path);
 #endif
     void* handle = hal_font_open(path);
     if (!handle) {
@@ -23,13 +22,13 @@ static bool readFontData(Font *font, const char *path) {
     hal_font_read(handle, &font->char_height, 1);
     hal_font_read(handle, &font->font_size, 1);
 #ifdef DEBUG
-    printf("font size: %d\n", font->font_size);
+    hal_printf("font size: %d\n", font->font_size);
 #endif
     // Allocate and read pixel data for each character
     for (int i = 0; i < 128; i++) {
         int width = font->char_widths[i];
         int num_pixels = width * font->char_height;
-        font->char_data[i] = malloc(num_pixels);
+        font->char_data[i] = hal_malloc(num_pixels);
         hal_font_read(handle, (char *)font->char_data[i], num_pixels);
     }
 
@@ -47,12 +46,12 @@ Font loadFont(const char *path) {
 // Function to get font data for a character as a boolean array
 bool* getFontData(Font font, char c)
 {
-    int width = font.char_widths[(char)c];
+    int width = font.char_widths[(unsigned char)c];
     int height = font.char_height;
-    const char *pixels = font.char_data[(char)c];
+    const char *pixels = font.char_data[(unsigned char)c];
 
     // Allocate memory for the boolean array
-    bool *boolArray = (bool *)malloc(width * height * sizeof(bool));
+    bool *boolArray = (bool *)hal_malloc(width * height * sizeof(bool));
 
     // Fill the boolean array based on pixel data
     for (int i = 0; i < height; i++)
@@ -73,9 +72,9 @@ void drawCharacter(Font font, int x, int y, char c, Color color)
     if (c < 0 || c > 127)
         return; // Only ASCII characters
 
-    int width = font.char_widths[(char)c];
+    int width = font.char_widths[(unsigned char)c];
     int height = font.char_height;
-    const char *pixels = font.char_data[(char)c];
+    const char *pixels = font.char_data[(unsigned char)c];
 
     for (int i = 0; i < height; i++)
     {
@@ -93,13 +92,13 @@ bool* getTextBitmap(Font font, const char *str)
 {
     int textWidth = getTextWidth(str, font);
     int textHeight = getTextHeight(font);
-    bool *boolArray = (bool *)malloc(textWidth * textHeight * sizeof(bool));
+    bool *boolArray = (bool *)hal_malloc(textWidth * textHeight * sizeof(bool));
     int offset = 0;
     while (*str != '\0')
     {
-        int width = font.char_widths[(char)*str];
+        int width = font.char_widths[(unsigned char)*str];
         int height = font.char_height;
-        const char *pixels = font.char_data[(char)*str];
+        const char *pixels = font.char_data[(unsigned char)*str];
 
         // Fill the boolean array based on pixel data
         for (int i = 0; i < height; i++)
@@ -121,7 +120,7 @@ void drawText(Font font, int x, int y, const char *str, Color color)
 {
     while (*str != '\0')
     {
-        int width = font.char_widths[(char)*str];
+        int width = font.char_widths[(unsigned char)*str];
         int height = font.char_height;
         if (x + width > SCREEN_WIDTH)
         {
@@ -140,7 +139,7 @@ int getTextWidth(const char *text, Font font)
     int width = 0;
     for (const char *p = text; *p; p++)
     {
-        width += font.char_widths[(int)*p];
+        width += font.char_widths[(unsigned char)*p];
     }
     return width;
 }
@@ -154,7 +153,7 @@ int getTextHeight(Font font)
 // Get width of a single character
 int getCharacterWidth(Font font, char c)
 {
-    return font.char_widths[(int)c];
+    return font.char_widths[(unsigned char)c];
 }
 
 // Get height of a single character (same as font height)

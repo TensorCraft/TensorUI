@@ -26,4 +26,17 @@ extern const Color COLOR_LIGHT_GRAY;
 extern const Color COLOR_DARK_GRAY;
 extern const Color COLOR_PINK;
 
+// Material 3 Palette
+extern const Color M3_PRIMARY;
+extern const Color M3_ON_PRIMARY;
+extern const Color M3_SECONDARY;
+extern const Color M3_SURFACE;
+extern const Color M3_SURFACE_VARIANT;
+extern const Color M3_ON_SURFACE;
+extern const Color M3_OUTLINE;
+extern const Color M3_ERROR;
+extern const Color M3_DARK_BG;
+extern const Color M3_SUCCESS;
+
+
 #endif

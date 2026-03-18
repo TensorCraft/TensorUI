@@ -1,7 +1,6 @@
 #ifndef FONT_H
 #define FONT_H
 
-#include <SDL2/SDL.h>
 #include "../../hal/screen/screen.h"
 #include "../../config.h"
 

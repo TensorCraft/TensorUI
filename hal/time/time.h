@@ -8,8 +8,10 @@
 #include <windows.h>
 #else
 #include <sys/time.h>
+#include <unistd.h>
 #endif
 
 long long current_timestamp_ms();
+void hal_sleep_ms(unsigned int ms);
 
 #endif

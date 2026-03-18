@@ -8,6 +8,7 @@ typedef struct {
     float progress; // 0.0 to 1.0
     Color barColor;
     Color bgColor;
+    int frameId;
 } ProgressBar;
 
 ProgressBar* createProgressBar(int x, int y, int w, int h, float initialProgress);

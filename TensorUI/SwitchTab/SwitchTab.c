@@ -1,6 +1,6 @@
 #include "SwitchTab.h"
-#include <stdlib.h>
-#include <string.h>
+#include "../../hal/mem/mem.h"
+#include "../../hal/str/str.h"
 #include "../../hal/screen/screen.h"
 #include "../Font/font.h"
 
@@ -22,9 +22,9 @@ static Color switchTabGetPixel(void *self, int x, int y) {
 
 static void switchTabPreRender(void *self) {
     SwitchTab *st = (SwitchTab *)self;
-    if (st->textBuffer) free(st->textBuffer);
-    st->textBuffer = (bool *)malloc(st->width * st->height * sizeof(bool));
-    memset(st->textBuffer, 0, st->width * st->height * sizeof(bool));
+    if (st->textBuffer) hal_free(st->textBuffer);
+    st->textBuffer = (bool *)hal_malloc(st->width * st->height * sizeof(bool));
+    hal_memset(st->textBuffer, 0, st->width * st->height * sizeof(bool));
 
     int tabWidth = st->width / st->numTabs;
     int textHeight = getTextHeight(st->font);
@@ -64,7 +64,7 @@ static void switchTabOnClick(void *self) {
 }
 
 SwitchTab* createSwitchTab(int x, int y, int w, int h, int numTabs, char **names, Font font, void (*onTabChange)(int index)) {
-    SwitchTab *st = (SwitchTab *)malloc(sizeof(SwitchTab));
+    SwitchTab *st = (SwitchTab *)hal_malloc(sizeof(SwitchTab));
     st->x = x;
     st->y = y;
     st->width = w;
@@ -77,6 +77,11 @@ SwitchTab* createSwitchTab(int x, int y, int w, int h, int numTabs, char **names
     st->onTabChange = onTabChange;
 
     switchTabPreRender(st);
-    requestFrame(w, h, x, y, st, switchTabPreRender, switchTabGetPixel, switchTabOnClick, NULL);
+    st->frameId = requestFrame(w, h, x, y, st, switchTabPreRender, switchTabGetPixel, switchTabOnClick, NULL);
+    if (st->frameId == -1) {
+        if (st->textBuffer) hal_free(st->textBuffer);
+        hal_free(st);
+        return NULL;
+    }
     return st;
 }
