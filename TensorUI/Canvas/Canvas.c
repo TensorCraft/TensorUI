@@ -1,6 +1,7 @@
 #include "Canvas.h"
 #include "../../hal/mem/mem.h"
 #include "../../hal/screen/screen.h"
+#include <stdlib.h>
 
 extern Frame Frames[];
 extern bool renderFlag;

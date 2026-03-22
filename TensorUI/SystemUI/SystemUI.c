@@ -6,6 +6,7 @@
 #include "../Color/color.h"
 #include "../Animation/Tween.h"
 #include "../WindowManager.h"
+#include <stdlib.h>
 
 #define SYSTEMUI_MAX_NOTIFICATIONS 8
 #define STATUS_BAR_HEIGHT 24

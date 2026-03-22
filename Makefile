@@ -11,6 +11,7 @@ LDFLAGS = -L/opt/homebrew/lib -lSDL2
 
 SRCFILES = examples/TensorOS_Demo/main.c \
            hal/screen/screen.c \
+           hal/screen/screen_backend_sdl.c \
            hal/time/time.c \
            hal/input/input_hal.c \
            hal/mem/mem.c \
@@ -54,6 +55,7 @@ TARGET = sdl_example
 TEST_TARGET = render_invalidation_test
 TEST_SRCFILES = tests/render_invalidation_test.c \
                 hal/screen/screen.c \
+                hal/screen/screen_backend_sdl.c \
                 hal/mem/mem.c \
                 TensorUI/Color/color.c
 

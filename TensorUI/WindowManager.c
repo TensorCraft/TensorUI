@@ -2,6 +2,7 @@
 #include "../hal/stdio/stdio.h"
 #include "../hal/time/time.h"
 #include "Animation/Tween.h"
+#include <stdlib.h>
 
 
 extern Frame Frames[];

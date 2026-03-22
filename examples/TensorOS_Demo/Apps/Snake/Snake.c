@@ -3,6 +3,7 @@
 #include "../../../../hal/screen/screen.h"
 #include "../../../../hal/rand/rand.h"
 #include "../../../../hal/time/time.h"
+#include <stdlib.h>
 
 #define GRID_SIZE 15
 #define MAX_SNAKE_LEN 100

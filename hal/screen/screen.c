@@ -1,12 +1,11 @@
 #include "screen.h"
+#include "screen_backend.h"
 #include "../../TensorUI/Color/color.h"
 #include "../time/time.h"
 #include "../mem/mem.h"
+#include <stdlib.h>
 #include <stdint.h>
 
-SDL_Window *window = NULL;
-SDL_Renderer *renderer = NULL;
-static SDL_Texture *screenTexture = NULL;
 static uint32_t *screenPixels = NULL;
 typedef struct {
     bool valid;
@@ -384,7 +383,7 @@ void textInputPaste(void) {
     }
 }
 
-static void beginInputSession(int x, int y, Uint32 timestamp) {
+static void beginInputSession(int x, int y, uint32_t timestamp) {
     currentInputSession = (InputSession){
         .active = true,
         .dragging = false,
@@ -424,16 +423,16 @@ void cancelAllFrameInteractions(void) {
         cancelFrameInteraction(i);
     }
     resetInputSession();
-    SDL_CaptureMouse(SDL_FALSE);
+    screen_backend_set_pointer_capture(false);
     renderFlag = true;
 }
 
-static void completeInputSession(int x, int y, Uint32 timestamp) {
+static void completeInputSession(int x, int y, uint32_t timestamp) {
     currentInputSession.currentX = x;
     currentInputSession.currentY = y;
     if (!currentInputSession.active) {
         resetInputSession();
-        SDL_CaptureMouse(SDL_FALSE);
+        screen_backend_set_pointer_capture(false);
         return;
     }
 
@@ -445,7 +444,7 @@ static void completeInputSession(int x, int y, Uint32 timestamp) {
 
     int dx = x - currentInputSession.startX;
     int dy = y - currentInputSession.startY;
-    Uint32 gestureDurationMs = timestamp - currentInputSession.startTimeMs;
+    uint32_t gestureDurationMs = timestamp - currentInputSession.startTimeMs;
     bool startedNearBottomEdge = currentInputSession.startY > SCREEN_HEIGHT - HOME_EDGE_ZONE_PX;
     bool movedUpFarEnough = dy < -HOME_COMPLETE_DY_PX;
     bool stronglyVertical = abs(dy) * 3 > abs(dx) * 4;
@@ -462,7 +461,7 @@ static void completeInputSession(int x, int y, Uint32 timestamp) {
 
     releaseInputOwner();
     resetInputSession();
-    SDL_CaptureMouse(SDL_FALSE);
+    screen_backend_set_pointer_capture(false);
     renderFlag = true;
 }
 
@@ -479,15 +478,8 @@ static void updateActiveMotion(int x, int y) {
 }
 
 static bool isLeftMousePressedGlobally(int *windowRelativeX, int *windowRelativeY) {
-    int globalX = 0;
-    int globalY = 0;
-    Uint32 buttons = SDL_GetGlobalMouseState(&globalX, &globalY);
-    int windowX = 0;
-    int windowY = 0;
-    SDL_GetWindowPosition(window, &windowX, &windowY);
-    if (windowRelativeX) *windowRelativeX = globalX - windowX;
-    if (windowRelativeY) *windowRelativeY = globalY - windowY;
-    bool pressed = (buttons & SDL_BUTTON(SDL_BUTTON_LEFT)) != 0;
+    bool pressed = false;
+    screen_backend_get_pointer_state(windowRelativeX, windowRelativeY, &pressed);
     return pressed;
 }
 
@@ -815,61 +807,16 @@ bool init_screen(const char *title, int width, int height)
     precalculateRoundMask();
 #endif
 
-    if (SDL_Init(SDL_INIT_VIDEO) != 0)
-    {
-        printf("SDL_Init Error: %s\n", SDL_GetError());
-        return false;
-    }
-
-    window = SDL_CreateWindow("TensorUI Emulator",
-                              SDL_WINDOWPOS_CENTERED,
-                              SDL_WINDOWPOS_CENTERED,
-                              SCREEN_WIDTH,
-                              SCREEN_HEIGHT,
-                              SDL_WINDOW_SHOWN);
-    if (!window)
-    {
-        printf("SDL_CreateWindow Error: %s\n", SDL_GetError());
-        SDL_Quit();
-        return false;
-    }
-
-    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
-    if (!renderer)
-    {
-        SDL_DestroyWindow(window);
-        printf("SDL_CreateRenderer Error: %s\n", SDL_GetError());
-        SDL_Quit();
-        return false;
-    }
-
-    screenTexture = SDL_CreateTexture(renderer,
-                                      SDL_PIXELFORMAT_RGBA8888,
-                                      SDL_TEXTUREACCESS_STREAMING,
-                                      SCREEN_WIDTH,
-                                      SCREEN_HEIGHT);
-    if (!screenTexture)
-    {
-        SDL_DestroyRenderer(renderer);
-        SDL_DestroyWindow(window);
-        printf("SDL_CreateTexture Error: %s\n", SDL_GetError());
-        SDL_Quit();
-        renderer = NULL;
-        window = NULL;
-        return false;
-    }
-
     screenPixels = (uint32_t *)hal_malloc((size_t)SCREEN_WIDTH * (size_t)SCREEN_HEIGHT * sizeof(uint32_t));
     if (!screenPixels)
     {
-        SDL_DestroyTexture(screenTexture);
-        SDL_DestroyRenderer(renderer);
-        SDL_DestroyWindow(window);
         printf("screen buffer allocation failed\n");
-        SDL_Quit();
-        screenTexture = NULL;
-        renderer = NULL;
-        window = NULL;
+        return false;
+    }
+
+    if (!screen_backend_init(title, width, height)) {
+        hal_free(screenPixels);
+        screenPixels = NULL;
         return false;
     }
 
@@ -1015,22 +962,21 @@ void fillCircle(int x, int y, int r, Color color)
 
 bool updateScreen()
 {
-    SDL_Event event;
-    while (SDL_PollEvent(&event))
+    ScreenPlatformEvent event;
+    while (screen_backend_poll_event(&event))
     {
-        if (event.type == SDL_QUIT)
+        if (event.type == SCREEN_PLATFORM_EVENT_QUIT)
         {
-            printf("SDL_QUIT received, closing...\n");
+            printf("screen backend requested shutdown, closing...\n");
             close_screen();
             return false;
         }
-        // ... (Touch input handling - stays the same for now)
-        if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
-            beginInputSession(event.button.x, event.button.y, event.button.timestamp);
-            SDL_CaptureMouse(SDL_TRUE);
+        if (event.type == SCREEN_PLATFORM_EVENT_POINTER_DOWN) {
+            beginInputSession(event.x, event.y, event.timestamp_ms);
+            screen_backend_set_pointer_capture(true);
             int topHitFrameId = -1;
             for(int i = frameCount - 1; i >= 0; i--) {
-                if(pointHitsFrame(i, event.button.x, event.button.y)) {
+                if(pointHitsFrame(i, event.x, event.y)) {
                     if (topHitFrameId == -1) {
                         topHitFrameId = i;
                     }
@@ -1047,23 +993,23 @@ bool updateScreen()
             }
             updateFocusForPress(topHitFrameId);
         }
-        if (event.type == SDL_MOUSEMOTION && currentInputSession.active &&
-            ((event.motion.state & SDL_BUTTON_LMASK) || SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_LEFT))) {
-            updateActiveMotion(event.motion.x, event.motion.y);
+        if (event.type == SCREEN_PLATFORM_EVENT_POINTER_MOVE && currentInputSession.active) {
+            int relativeX = event.x;
+            int relativeY = event.y;
+            bool pressed = isLeftMousePressedGlobally(&relativeX, &relativeY);
+            if (pressed) {
+                updateActiveMotion(relativeX, relativeY);
+            }
         }
-        if (event.type == SDL_MOUSEBUTTONUP && event.button.button == SDL_BUTTON_LEFT) {
-            completeInputSession(event.button.x, event.button.y, event.button.timestamp);
+        if (event.type == SCREEN_PLATFORM_EVENT_POINTER_UP) {
+            completeInputSession(event.x, event.y, event.timestamp_ms);
         }
-        if (event.type == SDL_WINDOWEVENT &&
-            (event.window.event == SDL_WINDOWEVENT_FOCUS_LOST ||
-             event.window.event == SDL_WINDOWEVENT_HIDDEN ||
-             event.window.event == SDL_WINDOWEVENT_LEAVE) &&
-            currentInputSession.active) {
+        if (event.type == SCREEN_PLATFORM_EVENT_WINDOW_INACTIVE && currentInputSession.active) {
             int relativeX = currentInputSession.currentX;
             int relativeY = currentInputSession.currentY;
             bool pressed = isLeftMousePressedGlobally(&relativeX, &relativeY);
             if (!pressed) {
-                completeInputSession(relativeX, relativeY, SDL_GetTicks());
+                completeInputSession(relativeX, relativeY, screen_backend_ticks());
             }
         }
     }
@@ -1073,7 +1019,7 @@ bool updateScreen()
         int relativeY = currentInputSession.currentY;
         bool pressed = isLeftMousePressedGlobally(&relativeX, &relativeY);
         if (!pressed) {
-            completeInputSession(relativeX, relativeY, SDL_GetTicks());
+            completeInputSession(relativeX, relativeY, screen_backend_ticks());
         } else {
             updateActiveMotion(relativeX, relativeY);
         }
@@ -1211,19 +1157,7 @@ bool updateScreen()
         }
     }
 #endif
-    SDL_Rect dirtyRect = {
-        .x = dirty.x,
-        .y = dirty.y,
-        .w = dirty.width,
-        .h = dirty.height,
-    };
-    SDL_UpdateTexture(screenTexture,
-                      &dirtyRect,
-                      screenPixels + dirty.y * SCREEN_WIDTH + dirty.x,
-                      SCREEN_WIDTH * (int)sizeof(uint32_t));
-    SDL_RenderClear(renderer);
-    SDL_RenderCopy(renderer, screenTexture, NULL, NULL);
-    SDL_RenderPresent(renderer);
+    screen_backend_present(dirty.x, dirty.y, dirty.width, dirty.height, screenPixels, SCREEN_WIDTH);
     refreshPresentedBoundsSnapshots();
     return true;
 }
@@ -1235,14 +1169,7 @@ void close_screen()
     if (screenPixels)
         hal_free(screenPixels);
     screenPixels = NULL;
-    if (screenTexture)
-        SDL_DestroyTexture(screenTexture);
-    screenTexture = NULL;
-    if (renderer)
-        SDL_DestroyRenderer(renderer);
-    if (window)
-        SDL_DestroyWindow(window);
-    SDL_Quit();
+    screen_backend_shutdown();
 }
 
 int requestFrame(int width, int height, int x, int y, void *object, 

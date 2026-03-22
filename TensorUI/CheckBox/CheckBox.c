@@ -2,6 +2,7 @@
 #include "../../hal/math/math.h"
 #include "../../hal/mem/mem.h"
 #include "../../hal/screen/screen.h"
+#include <stdlib.h>
 
 static Color checkboxGetPixel(void *self, int x, int y) {
     CheckBox *cb = (CheckBox *)self;

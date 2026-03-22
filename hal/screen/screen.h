@@ -2,8 +2,8 @@
 #define SCREEN_H
 
 #include <stdio.h>
-#include <SDL2/SDL.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include "../../TensorUI/Color/color.h"
 #include "../../config.h"
 
@@ -38,7 +38,7 @@ typedef struct {
     int startY;
     int currentX;
     int currentY;
-    Uint32 startTimeMs;
+    uint32_t startTimeMs;
     int clickCandidateFrameId;
     int ownerFrameId;
     GestureIntent gestureIntent;
@@ -124,7 +124,6 @@ extern int focus;
 extern InputSession currentInputSession;
 extern TextInputTarget currentTextInputTarget;
 extern bool renderFlag;
-extern SDL_Renderer *renderer;
 extern Frame Frames[MAX_FRAMES];
 extern DirtyRegion pendingDirtyRegion;
 
